@@ -1,0 +1,10 @@
+{
+  "hooks": [
+    {
+      "type": "PreToolUse",
+      "matcher": "Bash",
+      "hook_file": "pii-commit-guard.sh",
+      "description": "Scans git commit diffs for accidental exposure of raw PII (emails, phone numbers, Aadhaar, secrets) before committing."
+    }
+  ]
+}

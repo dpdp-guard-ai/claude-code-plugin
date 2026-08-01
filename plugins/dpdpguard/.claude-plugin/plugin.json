@@ -1,0 +1,16 @@
+{
+  "name": "dpdpguard",
+  "version": "1.0.0",
+  "display_name": "DPDPGuard Privacy Compliance",
+  "description": "Multi-regulation privacy compliance plugin (DPDP Act, GDPR, CCPA, PDPA) offering audit tools, consent builders, DSR portals, breach assistance, and live MCP backend integration.",
+  "entry": {
+    "skills": "skills",
+    "agents": "agents",
+    "hooks": "hooks",
+    "commands": "commands"
+  },
+  "requires": {
+    "tools": ["Bash", "Read", "Write"],
+    "mcp": ["dpdpguard"]
+  }
+}

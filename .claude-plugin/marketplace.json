@@ -1,0 +1,19 @@
+{
+  "schema_version": "v1",
+  "name": "dpdpguard",
+  "display_name": "DPDPGuard Privacy Compliance Marketplace",
+  "description": "First-party Claude Code & Codex marketplace for DPDP Act 2023, GDPR, CCPA, and PDPA privacy compliance tooling.",
+  "homepage_url": "https://github.com/dpdpguard/claude-code-plugin",
+  "repository_url": "https://github.com/dpdpguard/claude-code-plugin",
+  "readme_url": "https://github.com/dpdpguard/claude-code-plugin#readme",
+  "author": {
+    "name": "DPDPGuard Team",
+    "url": "https://dpdpguard.com"
+  },
+  "plugins": [
+    {
+      "name": "dpdpguard",
+      "path": "plugins/dpdpguard"
+    }
+  ]
+}

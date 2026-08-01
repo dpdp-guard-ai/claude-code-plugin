@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+.bun/
+
+# Build output
+dist/
+*.tgz
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# IDE
+.idea/
+.vscode/settings.json
+*.code-workspace
+
+# DPDPGuard Cache
+.dpdpguard-cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Testing
+coverage/
+
+# Temporary
+tmp/
+.cache/

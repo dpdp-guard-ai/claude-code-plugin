@@ -1,0 +1,24 @@
+{
+  "name": "dpdpguard",
+  "version": "1.0.0",
+  "display_name": "DPDPGuard Privacy Compliance",
+  "description": "Multi-regulation privacy compliance plugin (DPDP Act, GDPR, CCPA, PDPA) offering audit tools, consent builders, DSR portals, breach assistance, and live MCP backend integration.",
+  "entry": {
+    "skills_dir": "skills",
+    "agents_dir": "agents"
+  },
+  "requires": {
+    "tools": ["shell", "file_read", "file_write"],
+    "mcp": ["dpdpguard"]
+  },
+  "compatibility": {
+    "min_codex_version": "0.1.0",
+    "supported_runtimes": ["node", "bun"]
+  },
+  "codex_specific": {
+    "sandbox_policy": "relaxed",
+    "auto_approve_tools": ["shell", "file_read"]
+  },
+  "generated_from": ".claude-plugin/plugin.json",
+  "generated_at": "sync-codex"
+}

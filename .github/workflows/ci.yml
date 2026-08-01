@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check codex sync
+        run: |
+          bun run sync:codex
+          if ! git diff --quiet; then
+            echo "::error::Codex files are out of sync. Run 'bun run sync:codex' and commit."
+            git diff
+            exit 1
+          fi
+
+      - name: Run tests
+        run: bun test

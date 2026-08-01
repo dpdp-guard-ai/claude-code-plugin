@@ -1,0 +1,19 @@
+name: "DPDPGuard Multi-Regulation Privacy Compliance Audit"
+description: "Audit pull requests and codebases for privacy violations across DPDP Act 2023, GDPR, CCPA, and PDPA."
+author: "DPDPGuard Team"
+inputs:
+  regulations:
+    description: "Comma-separated list of regulations to audit (dpdp,gdpr,ccpa,pdpa)"
+    required: false
+    default: "dpdp,gdpr,ccpa,pdpa"
+  fail-on:
+    description: "Severity threshold to fail the build (critical|high|medium|low|never)"
+    required: false
+    default: "high"
+  config:
+    description: "Path to .dpdpguard.yaml config file"
+    required: false
+    default: ".dpdpguard.yaml"
+runs:
+  using: "node20"
+  main: "bin/audit-ci.js"
