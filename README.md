@@ -14,8 +14,13 @@ Claude Code plugin bringing **multi-regulation privacy compliance** (DPDP Act
 - **Respond** — a breach workflow that pins the 72-hour clock to the awareness
   timestamp and drafts both the Board intimation and the affected-principal
   notice.
+- **Integrate** — resolve each deployable in a workspace to the right DPDP Guard
+  component (embeddable widget, client SDKs, server SDKs, or a client generated
+  from the published API contract) and wire it, including the server-side
+  enforcement and webhook handling a client-only integration leaves out.
 - **Operate** — live posture, gap, and DSR-queue queries against the DPDPGuard
-  MCP server.
+  MCP agent surface at `/mcp/v1`, with every state change raised as a proposal
+  for a named human to approve.
 - **Guard** — a `PreToolUse` hook that blocks `git commit` when the staged diff
   contains personal data, identity numbers, or credentials.
 
@@ -46,9 +51,12 @@ npx @dpdpguard/claude-code-plugin init
 | `/dpdp-consent` | Consent banner, preference centre, and privacy notice |
 | `/dpdp-breach` | 72-hour breach response workflow and notification drafts |
 | `/dpdp-dsr` | List, inspect, and act on Data Subject Rights requests |
+| `/dpdp-connect` | Resolve the workspace to DPDP Guard components and wire MCP access |
 
 See [`plugins/dpdpguard/README.md`](plugins/dpdpguard/README.md) for the full
-skill, agent, and hook reference.
+skill, agent, and hook reference, and
+[`docs/dpdpbot-alignment.md`](docs/dpdpbot-alignment.md) for how this plugin
+maps onto the DPDP Guard platform's actual SDK, API, and agent surfaces.
 
 ## Repository layout
 
@@ -69,9 +77,9 @@ plugins/dpdpguard/
 ├── .claude-plugin/plugin.json    # plugin manifest (source of truth)
 ├── .codex-plugin/plugin.json     # generated — never edit by hand
 ├── hooks/                        # hooks.json + POSIX sh guards
-├── skills/                       # 8 skills, some with references/
+├── skills/                       # 13 skills, some with references/
 ├── agents/                       # 3 subagents
-└── commands/                     # 6 slash commands
+└── commands/                     # 7 slash commands
 ```
 
 ## Development
