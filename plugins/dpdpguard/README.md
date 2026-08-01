@@ -18,10 +18,34 @@ duplicating the method.
 | `dpdp-child-protection` | Age assurance, parental consent, §9(3) tracking suppression | — |
 | `dpdp-integration` | SDK integration across web, mobile, and backend stacks | — |
 | `dpdp-operations` | Live MCP posture queries and DPO approval proposals | — |
+| `dpdp-sdk-selector` | Resolve each deployable to the right DPDP Guard component | `references/component-matrix.md` |
+| `dpdp-server-sdk` | Backend enforcement, token brokering, webhooks, audit export | `references/webhook-handling.md` |
+| `dpdp-mcp-connect` | Credentials, scopes, and the proposal model for `/mcp/v1` | `references/tool-catalog.md` |
+| `dpdp-consent-widget` | Drop-in `consent.js` embed, tracker auto-blocking, Consent Mode v2 | — |
+| `dpdp-contract-conformance` | Generated clients, error catalog, audit-hash vectors | — |
 
 The audit rule catalog is the single source of detection logic. The
 `dpdp-audit` skill and the `compliance-auditor` agent both read from it, so a
 rule added there takes effect in both.
+
+### Integration skills, and which to reach for
+
+`dpdp-sdk-selector` runs first and decides the rest. It resolves each deployable
+in a workspace to a real, published component, because DPDP Guard is not one
+SDK — it is five integration surfaces with different credential classes:
+
+| Surface | Skill |
+|---|---|
+| Website, no build step | `dpdp-consent-widget` |
+| Web/mobile app with a build | `dpdp-integration` (+ `dpdp-consent-builder`) |
+| Backend service | `dpdp-server-sdk` |
+| Language with no official SDK | `dpdp-contract-conformance` |
+| Agent access to live state | `dpdp-mcp-connect` → `dpdp-operations` |
+
+A client-only integration is unfinished whenever there is a backend: consent
+capture without server-side enforcement records a preference and never acts on
+it. See [`docs/dpdpbot-alignment.md`](../../docs/dpdpbot-alignment.md) for the
+gap review these skills came out of.
 
 ## Agents
 
@@ -46,6 +70,7 @@ explicitly.
 | `/dpdp-consent` | `[--purposes …] [--locales …]` |
 | `/dpdp-breach` | `"<incident summary>"` |
 | `/dpdp-dsr` | `[overdue\|list\|show <id>\|acknowledge <id>]` |
+| `/dpdp-connect` | `[mcp\|sdk\|all] [--tenant https://<deployment>.convex.site]` |
 
 ## Hooks
 
