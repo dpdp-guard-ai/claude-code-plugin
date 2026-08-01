@@ -38,11 +38,15 @@ audit:
 
 consent:
   default_locale: "en"
-  supported_locales: ["en", "hi", "ta", "te", "bn", "mr", "gu", "kn", "ml"]
+  # List only locales that are genuinely translated. A switcher offering a
+  # language that silently falls back to English is misleading.
+  supported_locales: ["en"]
 
 mcp:
   enabled: true
-  api_url: "https://mcp.dpdpguard.com/v1"
+  # The agent surface is per-deployment: <your tenant base URL>/mcp/v1.
+  # Read the base URL from your DPDPGuard dashboard — there is no shared host.
+  api_url: ""
 
 telemetry:
   enabled: true

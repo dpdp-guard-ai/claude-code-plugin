@@ -18,7 +18,8 @@ Arguments: `$ARGUMENTS`
 1. Verify the MCP server is configured and reachable. If it is not, say so
    plainly and stop. **Never synthesise a score or gap list** — fabricated
    compliance numbers get pasted into board decks.
-2. Call `compliance_score_get` and `posture_gaps_list`.
+2. Call `capabilities_list` first — tool availability depends on scopes, plan
+   tier, and feature flags. Then call `posture_get` and `posture_gaps_list`.
 3. Render the summary card, then the gaps grouped by severity, filtered by
    `--severity` if given. With `--gaps-only`, skip the score.
 4. Timestamp the output with when the data was fetched.

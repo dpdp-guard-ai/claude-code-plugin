@@ -17,9 +17,11 @@ Arguments: `$ARGUMENTS`
 
 - `overdue` (default when no argument) — call `dsr_overdue_list` and show the
   queue sorted by how far past deadline each request is.
-- `list` — the full open queue with `dueAt` and days remaining.
-- `show <id>` — detail for one request.
-- `acknowledge <id>` — create a `dsr_acknowledge_propose` proposal.
+- `list` — call `dsr_list` for the full open queue with `dueAt` and days
+  remaining.
+- `show <id>` — call `dsr_get`, and `dsr_summarize` when a triage summary helps.
+- `acknowledge <id>` — create a `dsr_status_propose` proposal. It requires a
+  `rationale`; ask for one rather than inventing it.
 
 ## Steps
 
@@ -35,10 +37,12 @@ Arguments: `$ARGUMENTS`
 ## For `acknowledge`
 
 1. Show the exact proposal payload and ask for explicit confirmation.
-2. On confirmation, call `dsr_acknowledge_propose`.
+2. On confirmation, call `dsr_status_propose`.
 3. Report the result as **"proposal created, pending DPO approval"** — never as
    "acknowledged" or "responded". A user who believes a request has been
    answered when only a draft exists may miss a statutory deadline.
+4. Offer a `deep_link` to the approval screen. Approval is a human action in the
+   DPDPGuard UI and is deliberately not an MCP tool.
 
 ## Rules
 
