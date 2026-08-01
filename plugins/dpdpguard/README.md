@@ -72,6 +72,30 @@ explicitly.
 | `/dpdp-dsr` | `[overdue\|list\|show <id>\|acknowledge <id>]` |
 | `/dpdp-connect` | `[mcp\|sdk\|all] [--tenant https://<deployment>.convex.site]` |
 
+## MCP server
+
+`.mcp.json` at the plugin root registers the `dpdpguard` remote HTTP server, so
+installing the plugin is enough to get a connectable agent surface:
+
+```json
+{ "mcpServers": { "dpdpguard": { "type": "http", "url": "${DPDPGUARD_TENANT_URL}/mcp/v1" } } }
+```
+
+The agent surface is **per-deployment** — there is no shared host — so the URL
+is assembled from `DPDPGUARD_TENANT_URL`, which Claude Code expands in an HTTP
+server's `url` field. The user sets that one variable; nothing else is
+configured.
+
+**No credential is declared here, deliberately.** The entry carries no
+`headers`, so Claude Code runs its OAuth 2.1 + PKCE flow: it reads the
+`WWW-Authenticate` header the surface returns on 401, discovers the
+authorization server, self-registers via RFC 7591 DCR, and prompts for sign-in
+at `/mcp`. Setting `headers.Authorization` here would suppress that fallback —
+a rejected header is reported as a failed connection, not as a sign-in prompt.
+
+Unattended agent keys are the exception and are added per-machine with
+`claude mcp add --header`, never committed. See the `dpdp-mcp-connect` skill.
+
 ## Hooks
 
 | Hook | Event | Behaviour |

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "dpdpguard": {
+      "type": "http",
+      "url": "${DPDPGUARD_TENANT_URL}/mcp/v1"
+    }
+  }
+}

@@ -76,6 +76,7 @@ test/plugin.test.ts
 plugins/dpdpguard/
 ├── .claude-plugin/plugin.json    # plugin manifest (source of truth)
 ├── .codex-plugin/plugin.json     # generated — never edit by hand
+├── .mcp.json                     # remote agent surface, OAuth via Claude Code
 ├── hooks/                        # hooks.json + POSIX sh guards
 ├── skills/                       # 13 skills, some with references/
 ├── agents/                       # 3 subagents

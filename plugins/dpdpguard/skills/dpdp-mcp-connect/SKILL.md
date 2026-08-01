@@ -57,29 +57,68 @@ powers" is not achievable by editing scopes on a non-DPO account.
 
 ## Connecting
 
-The surface supports **Dynamic Client Registration (RFC 7591)**, so an MCP
-client can self-register against a tenant with nothing but the URL — no manual
-client-secret exchange. For Claude Code, add the remote server and complete the
-OAuth flow in the browser:
+**This plugin ships the server definition.** Installing it registers a
+`dpdpguard` MCP server pointed at `${DPDPGUARD_TENANT_URL}/mcp/v1`, so the only
+thing the user supplies is the tenant URL:
 
 ```bash
-claude mcp add --transport http dpdpguard https://<deployment>.convex.site/mcp/v1
+export DPDPGUARD_TENANT_URL=https://<deployment>.convex.site
 ```
 
-For an unattended agent key, supply it as a bearer header instead of running the
-OAuth flow, and put the key in the environment — never inline in a committed
-config file:
+Set it in the shell profile or the project's environment, not inline in a
+committed file. If the variable is unset the server will fail to connect with a
+malformed URL — check it before debugging anything on the server side.
+
+**You do not implement OAuth; Claude Code does.** The surface supports
+OAuth 2.1 + PKCE with Dynamic Client Registration (RFC 7591), and it returns a
+`WWW-Authenticate` header on 401 naming its protected-resource document. Claude
+Code reads that, discovers the authorization server, self-registers, and runs
+the flow — no client secret, no manual configuration. The user completes sign-in
+with:
+
+```text
+/mcp
+```
+
+or `claude mcp login dpdpguard`. Tokens refresh automatically; re-authenticate
+from the same panel if a refresh is rejected.
+
+If a user prefers to add it manually rather than via the plugin:
 
 ```bash
-claude mcp add --transport http dpdpguard https://<deployment>.convex.site/mcp/v1 \
+claude mcp add --transport http dpdpguard "$DPDPGUARD_TENANT_URL/mcp/v1"
+```
+
+For an **unattended** agent key, supply it as a bearer header instead of running
+the OAuth flow, and keep the key in the environment:
+
+```bash
+claude mcp add --transport http dpdpguard "$DPDPGUARD_TENANT_URL/mcp/v1" \
   --header "Authorization: Bearer ${DPDPGUARD_AGENT_KEY}"
 ```
+
+Note the interaction: if an `Authorization` header is configured and the server
+rejects it, Claude Code reports the connection as **failed** rather than falling
+back to OAuth. So do not set the header on a connection you intend to
+authenticate interactively — an expired agent key there produces a connection
+error, not a sign-in prompt.
 
 Then **verify with `capabilities_list` before doing anything else.** It returns
 the tools this credential can actually reach, the plan headroom, and the active
 capabilities. It is the only reliable answer to "what can I do here", because
 capability is a runtime property of flags, plan tier, and scopes — not something
 that can be read off the catalog statically.
+
+### What the tenant must have enabled
+
+The connection fails in ways that look like client problems when it is really
+platform configuration. Check these first:
+
+| Requirement | Symptom when missing |
+|---|---|
+| `dpdp_mcp_surface_enabled` on | Every `/mcp/v1` route 404s, including the OAuth discovery documents |
+| `agentAccessEnabled` not false for the org | `capabilities_list` returns an empty tool array with `unavailableReason: "ORG_DISABLED"` |
+| The signing-in human holds `dpo` or `fiduciaryAdmin` | Sign-in succeeds but the grant carries no scopes — a `dataPrincipal` cannot delegate compliance access at all |
 
 ## Scopes
 
