@@ -42,10 +42,20 @@ page) rather than writing a remembered string into a manifest.
 | Surface | Credential | Use it for |
 |---|---|---|
 | **Embeddable widget** (`consent.js`) | none — public org/domain id | A website that needs a consent banner and tracker auto-blocking with no build step |
-| **Client SDKs** (JS, React Native, Android, iOS, Flutter) | brokered principal token, or anonymous | In-app consent capture, on-device tracker gating, DSR/grievance/nomination filing by the data principal |
-| **Server SDKs** (`@dpdpguard/server`, `dpdpguard-sdk`, `ai.dpdpguard:server-sdk`) | service API key | Server-side consent enforcement before processing, token brokering, webhook receipt, audit export |
+| **Client SDKs** (React Native, Android, iOS, Flutter; `@dpdpguard/js` for public reads) | brokered principal token, or anonymous | In-app consent capture, on-device tracker gating, DSR/grievance/nomination filing by the data principal |
+| **Server SDKs** (`@dpdpguard/server`, `dpdpguard-sdk`, `ai.dpdpguard:server-sdk`, `@dpdpguard/convex`) | service API key | Server-side consent gating before processing, token brokering, webhook receipt, audit-hash verification |
 | **Contract** (`@dpdpguard/contract`) | n/a | Generating a typed client for a language with no official SDK; pinning the wire shape; error-catalog handling |
 | **MCP agent surface** (`/mcp/v1`) | scoped agent key or delegated OAuth grant | An agent (Claude Code, Cowork) reading compliance posture and raising proposals for human approval |
+
+Two selections are easy to get wrong and worth checking explicitly:
+
+- **A Convex backend takes `@dpdpguard/convex`, not `@dpdpguard/server`.** It is
+  a Convex Component — reactive local caching, webhook routes mounted for you,
+  isolated schema, and Web Crypto so it runs in the V8 runtime.
+- **`@dpdpguard/js` is the public, unauthenticated slice only.** Org, notices,
+  banner config, anonymous consent. DSR, grievances, nominations, and token
+  brokering are `@dpdpguard/server`. Choosing js for a rights portal produces an
+  integration that cannot file anything.
 
 These are not alternatives to one another in the general case. A typical
 production integration uses **three at once**: widget or client SDK for

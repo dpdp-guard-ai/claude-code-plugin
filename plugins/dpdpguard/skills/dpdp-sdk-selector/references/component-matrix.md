@@ -8,18 +8,35 @@ confirm against the registry before writing one into a manifest.
 
 | Component | Package / coordinate | Registry | Notes |
 |---|---|---|---|
-| Web JS core | `@dpdpguard/js` | npm | Typed client generated against the contract. |
+| Web JS core | `@dpdpguard/js` | npm | **Public, unauthenticated `/api/v1` only** — org, notices, banner config, anonymous consent. Not a general client. |
 | React Native | `@dpdpguard/react-native` | npm | JS bridge over the native consent engines. |
-| Node server | `@dpdpguard/server` | npm | Reference server implementation. |
-| Python server | `dpdpguard-sdk` (`import dpdpguard`) | PyPI | Mirrors `@dpdpguard/server` method for method. |
+| Node server | `@dpdpguard/server` | npm | Reference server implementation; the authenticated surface. |
+| Python server | `dpdpguard-sdk` (`import dpdpguard`) | PyPI | Mirrors `@dpdpguard/server` in snake_case. **Synchronous** (`httpx.Client`). |
 | JVM server | `ai.dpdpguard:server-sdk` | Maven Central | Kotlin/Java. |
+| **Convex backend** | `@dpdpguard/convex` | npm | Convex **Component**, not a client. Reactive local caching, `registerRoutes()` webhook mounting, isolated schema, Web Crypto (V8-safe). Peer: `convex ^1.43.0`. |
 | Android consent | `ai.dpdpguard:consent-sdk` | Maven Central | Native banner, preference centre, on-device gating. |
 | iOS consent | `DPDPGuardConsent` | Swift Package Manager (git tag) | No CocoaPods leg, by design. |
-| Flutter | `dpdpguard_flutter` | pub.dev | Check the live pub.dev version — it has lagged the repo tag. |
+| Flutter | `dpdpguard_flutter` | pub.dev | Platform-channel bridge over the native engines. Check the live pub.dev version — it has lagged the repo tag. |
 | Wire contract | `@dpdpguard/contract` | npm (Apache-2.0) | OpenAPI 3.1 spec, error catalog, audit-hash vectors. |
 | Embeddable widget | `consent.js` | script tag, served from the DPDP Guard widget host | No package manager involved. |
 
 **There is no `@dpdpguard/sdk`.** Any reference to it is stale.
+
+### `@dpdpguard/js` vs `@dpdpguard/server` — the line that catches people
+
+They are not "browser one" and "server one". The split is **by authentication**:
+
+| | `@dpdpguard/js` | `@dpdpguard/server` |
+|---|---|---|
+| Surface | public, unauthenticated `/api/v1` | authenticated `/api/v1` |
+| Methods | `getOrgBySlug`, `getNoticesForOrg`, `getBannerConfig`, `giveConsentAnonymous`, `canonicalizeDataTypes` | the above plus `brokerToken`, DSR, grievance, nomination, `linkAnonymousConsent` |
+| Consent gate | — | `hasConsent(consents, purpose)` |
+| Webhook verify | — | `verifyWebhookSignature(...)` |
+| Audit hash | — | `computeAuditHash`, `canonicalizeAuditEvent` |
+
+DSR filing, grievances, nominations, and token brokering live in
+`@dpdpguard/server` and **cannot** be done from `@dpdpguard/js`. Reaching for
+the js package to file a DSR is the predictable wrong turn.
 
 Languages with **no** official SDK — Go, Ruby, PHP, .NET, Rust, Elixir — are
 served by generating a client from `@dpdpguard/contract`'s `openapi/v1.yaml`.
@@ -27,24 +44,34 @@ See the `dpdp-contract-conformance` skill.
 
 ## Capability matrix
 
-| Capability | Widget | JS | RN | Android | iOS | Flutter | Server SDKs |
-|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
-| Fetch published notices (multilingual) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Consent banner + preference centre | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| Give / withdraw consent (audited) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ (on behalf, brokered) |
-| Tracker / script auto-blocking | ✅ | partial | — | — | — | — | — |
-| On-device SDK gating (`isGranted`) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — |
-| **Server-side consent enforcement** | — | — | — | — | — | — | ✅ |
-| Offline queue + local proof | — | — | ✅ | ✅ | ✅ | ✅ | n/a |
-| Anonymous → linked consent | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| DSR filing + status | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ (orchestrate) |
-| Grievance filing | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Nomination (successor) | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Parental / age verification | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ (initiate) |
-| **Token brokering** | — | — | — | — | — | — | ✅ |
-| **Webhook receipt + HMAC verify** | — | — | — | — | — | — | ✅ |
-| **Audit-trail export** | — | — | — | — | — | — | ✅ |
-| Breach workflow (principal / Board / 72h) | — | — | — | — | — | — | ✅ |
+Verified against the published packages, not only the spec.
+
+| Capability | Widget | JS | RN | Android | iOS | Flutter | Server SDKs | Convex |
+|---|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| Fetch published notices (multilingual) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Consent banner + preference centre | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — |
+| Give consent — anonymous | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | — |
+| Tracker / script auto-blocking | ✅ | — | — | — | — | — | — | — |
+| On-device SDK gating | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | — |
+| **Server-side consent gate** | — | — | — | — | — | — | ✅ `hasConsent` | ✅ |
+| Offline queue + local proof | — | — | ✅ | ✅ | ✅ | ✅ | n/a | n/a |
+| Anonymous → linked consent | ✅ | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| DSR filing + status | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Grievance filing | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Nomination (successor) | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| **Token brokering** | — | — | — | — | — | — | ✅ | ✅ |
+| **Webhook receipt + HMAC verify** | — | — | — | — | — | — | ✅ | ✅ auto-mounted |
+| **Audit-hash compute / verify** | — | — | — | — | — | — | ✅ | — |
+| Reactive local cache of DSR/grievance/notice | — | — | — | — | — | — | — | ✅ |
+
+The `@dpdpguard/js` column is narrower than it looks in the spec's own feature
+matrix: the published package covers the **public, unauthenticated** slice
+only. Anything requiring a credential is `@dpdpguard/server`.
+
+Breach workflow, parental/age verification, and audit-trail export appear in
+the platform spec's feature matrix but are **not** methods on the published
+Node client. Treat them as HTTP endpoints to call directly (or via a generated
+client) until an SDK method exists — do not assume a helper is there.
 
 The rows in bold are the ones a client-only integration silently leaves
 unimplemented. A consent management platform that captures consent on the

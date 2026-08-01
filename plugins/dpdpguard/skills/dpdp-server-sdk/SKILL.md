@@ -31,6 +31,14 @@ Run `dpdp-sdk-selector` first if the target service has not been identified.
 | Node / TypeScript | `@dpdpguard/server` | npm |
 | Python | `dpdpguard-sdk` | `import dpdpguard` |
 | JVM (Kotlin / Java) | `ai.dpdpguard:server-sdk` | Maven Central |
+| **Convex** | `@dpdpguard/convex` | npm — see below |
+
+**If the backend is a Convex app, use `@dpdpguard/convex` instead.** It is a
+Convex Component, not a plain client: it syncs DSR requests, grievances, and
+notices into component-owned tables so the app gets live subscriptions instead
+of refetch loops, mounts webhook signature verification for you, keeps its
+schema invisible to the host app, and verifies signatures with Web Crypto so it
+runs in the V8 runtime without Node's `crypto`. Jump to "Convex apps" below.
 
 Anything else — Go, Ruby, PHP, .NET, Rust — has no official server SDK. Do not
 hand-write a client; use `dpdp-contract-conformance` to generate one from
@@ -40,11 +48,36 @@ hand-write a client; use `dpdp-contract-conformance` to generate one from
 (`npm view @dpdpguard/server version`, `pip index versions dpdpguard-sdk`, the
 Maven Central artifact page). Never write a remembered version string.
 
-**Read the installed package's own types before calling anything.** The Node
-and Python SDKs are hand-maintained against the contract, and the method names
-below are the shape to expect, not a guarantee for the version the project
-resolves. Scaffolding that calls methods which do not exist is worse than no
-scaffolding: it typechecks in review and fails in production.
+**Read the installed package's own types before calling anything.** The
+signatures below were read off the published packages, but they move.
+Scaffolding that calls methods which do not exist is worse than no scaffolding:
+it typechecks in review and fails in production.
+
+### The Node surface, as published
+
+```ts
+import {
+  DpdpGuardClient,        // class — typed client over /api/v1
+  hasConsent,             // (consents: ConsentRecord[], purpose: string) => boolean
+  verifyWebhookSignature, // (secret, rawBody, signatureHeader) => boolean
+  computeAuditHash,       // (input: AuditHashInput, secret: string) => string
+  canonicalizeAuditEvent, // (input: AuditHashInput) => string
+  DpdpGuardApiError,      // thrown on every non-2xx, carries `.code`
+  ERROR_CATALOG,
+} from "@dpdpguard/server";
+```
+
+`new DpdpGuardClient({ baseUrl, apiKey?, accessToken?, fetchImpl? })` —
+**`baseUrl` is required**; it is the tenant's own deployment origin. Methods:
+`getOrganization`, `getNotices`, `getNotice`, `getBannerConfig`, `brokerToken`,
+`setAccessToken`, `linkAnonymousConsent`, `listDsrRequests`, `createDsrRequest`,
+`listGrievances`, `createGrievance`, `getNomination`, `upsertNomination`,
+`revokeNomination`.
+
+The Python SDK mirrors this in snake_case (`DpdpGuardClient`, `has_consent`,
+`verify_webhook_signature`, `compute_audit_hash`), is **synchronous** (built on
+`httpx.Client`, not async), and raises `DpdpGuardApiError` with `.code` and
+`.status`.
 
 ## Step 1 — Credentials
 
@@ -63,31 +96,47 @@ dpdpg_live_…`), org-scoped, never a data principal credential.
 
 ## Step 2 — Consent enforcement before processing
 
-This is the highest-value ten lines in the whole integration and the step teams
-skip. Find every place the service processes personal data for a
-consent-dependent purpose — marketing sends, analytics ingestion, profiling,
-enrichment, model training — and gate it.
+This is the highest-value part of the integration and the step teams skip. Find
+every place the service processes personal data for a consent-dependent purpose
+— marketing sends, analytics ingestion, profiling, enrichment, model training —
+and gate it.
+
+**Understand what the gate actually is before you design around it.**
+`hasConsent` is a **pure predicate over consent records you already hold**. It
+makes no network call and there is no server-side "is this user consented?"
+lookup on the client:
 
 ```ts
-import { ConsentGate } from "@dpdpguard/server";
+import { hasConsent, type ConsentRecord } from "@dpdpguard/server";
 
-const gate = new ConsentGate({ apiKey: process.env.DPDPGUARD_API_KEY! });
-
-if (!(await gate.isGranted({ userId, purpose: "Marketing" }))) {
+// ConsentRecord = { purpose: string; withdrawnAt?: number | null }
+if (!hasConsent(consents, "Marketing")) {
   return; // do not send
 }
 ```
 
+That shape has a consequence worth stating plainly, because it decides the
+architecture: **the fiduciary holds the consent state, and webhooks are how it
+stays current.** The SDK does not poll DPDP Guard per send. So Step 4 is not
+optional garnish — it is the mechanism that keeps the array `hasConsent` reads
+from going stale. An integration with a gate and no webhook consumer gates on
+whatever it knew at signup.
+
 Rules for the gate:
 
-- **Fail closed.** If the gate call errors or times out, do not process. A
-  gate that treats "unknown" as "granted" is worse than no gate, because it
-  produces an audit trail that says consent was checked.
-- **Gate at the point of processing, not at the point of collection.** A flag
+- **Fail closed.** If consent state is missing, unloaded, or stale beyond your
+  tolerance, do not process. A gate that treats "unknown" as "granted" is worse
+  than no gate, because it produces an audit trail saying consent was checked.
+- **Gate at the point of processing, not at the point of collection.** State
   read once at signup and cached forever misses every subsequent withdrawal.
-- **Purpose strings must match the purposes published in the notice.** A gate
-  keyed on `"marketing"` when the notice publishes `"Marketing communications"`
-  silently never matches. Read the org's notice; do not invent purpose names.
+- **Purpose strings must match the purposes published in the notice.**
+  `hasConsent` compares the purpose string exactly, so a gate keyed on
+  `"marketing"` when the notice publishes `"Marketing communications"` silently
+  never matches — and fails *closed*, so the symptom is campaigns quietly not
+  sending rather than an error. Read the org's notices via
+  `client.getNotices(orgId)`; do not invent purpose names.
+- **Treat `withdrawnAt` as authoritative.** A record with a `withdrawnAt`
+  timestamp is not consent, regardless of what else the row says.
 - Grep for the processing that already happens — `sendgrid|mailchimp|segment|
   posthog|mixpanel|amplitude|braze|clevertap|webengage|openai|anthropic` — and
   report every call site you did **not** gate. An unreported ungated path is
@@ -125,20 +174,26 @@ Implementation requirements:
 DPDP Guard signs outbound webhook payloads with HMAC-SHA256 over the raw body
 and sends the hex digest in `X-DPDP-Signature`.
 
+**Use the SDK's verifier rather than hand-rolling HMAC.** It ships one, and a
+hand-written comparison is where constant-time bugs live:
+
 ```ts
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { verifyWebhookSignature } from "@dpdpguard/server";
 
-// The raw body — verify BEFORE any JSON parsing middleware touches it.
-const expected = createHmac("sha256", process.env.DPDPGUARD_WEBHOOK_SECRET!)
-  .update(rawBody)
-  .digest("hex");
-
-const ok =
-  signature.length === expected.length &&
-  timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+// (secret, rawBody, signatureHeader) => boolean
+const ok = verifyWebhookSignature(
+  process.env.DPDPGUARD_WEBHOOK_SECRET!,
+  rawBody,
+  req.headers["x-dpdp-signature"],
+);
 
 if (!ok) return res.status(401).end();
 ```
+
+Python: `verify_webhook_signature(secret, raw_body, signature_header)`. Convex:
+`registerRoutes(http)` wires verification for you — see "Convex apps" below.
+Only hand-roll when the language has no SDK; `references/webhook-handling.md`
+carries that fallback.
 
 - **Verify against the raw body.** A framework that parses and re-serialises
   JSON before your handler sees it will produce a different byte sequence and
@@ -173,6 +228,48 @@ a handler skeleton.
 - **Audit export.** Pull the immutable consent audit trail for the fiduciary's
   own retention and DPO reporting. Store it where your own retention policy can
   reach it; the export is evidence, so treat write access to it accordingly.
+
+## Convex apps
+
+`@dpdpguard/convex` is a Convex Component, so it is wired as one — not
+instantiated as a client:
+
+```ts
+// convex/convex.config.ts
+import { defineApp } from "convex/server";
+import dpdpguard from "@dpdpguard/convex/convex.config";
+
+const app = defineApp();
+app.use(dpdpguard);
+export default app;
+```
+
+```ts
+// convex/http.ts — mounts the webhook route with signature verification
+import { httpRouter } from "convex/server";
+import { registerRoutes } from "@dpdpguard/convex/http";
+
+const http = httpRouter();
+registerRoutes(http);
+export default http;
+```
+
+Then `new DpdpGuard(components.dpdpguard)`, whose methods take the Convex `ctx`
+as their first argument and are split by context — queries read
+(`getNotices`, `getBannerConfig`, `listDsrRequests`, `listGrievances`,
+`getNomination`), actions write (`brokerToken`, `linkAnonymousConsent`,
+`createDsrRequest`, `createGrievance`, `upsertNomination`, `revokeNomination`).
+Call `configure(ctx, { baseUrl, apiKey, orgId })` once from a mutation before
+anything else.
+
+Two differences from the plain server SDK that change how you build:
+
+- Methods are keyed on the fiduciary's own **`externalId`**, not a brokered
+  token you manage — the component brokers internally.
+- DSR, grievance, and notice state syncs into component tables, so the frontend
+  subscribes to it live. Do not rebuild a polling refetch layer on top.
+
+Requires `convex ^1.43.0` as a peer dependency.
 
 ## Step 6 — Verify
 
