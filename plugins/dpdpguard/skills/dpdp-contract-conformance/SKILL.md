@@ -107,7 +107,13 @@ the original audit anchor rather than creating a second record.
 
 ## Step 5 — Verify against the golden vectors
 
-If your integration computes or verifies audit hashes at all, run
+**If an official SDK covers your language, do not reimplement this.**
+`@dpdpguard/server` exports `computeAuditHash(input, secret)` and
+`canonicalizeAuditEvent(input)`; the Python SDK exports `compute_audit_hash`
+and `canonicalize_audit_event`. Use them. The vectors below are for verifying
+an implementation you were forced to write, not for re-testing a shipped one.
+
+If your integration computes or verifies audit hashes itself, run
 `conformance/audit-hash-vectors.json` against your implementation before
 trusting it. The vectors are golden input → output pairs for the HMAC-SHA256
 canonicalization described in `conformance/audit-hash-spec.md`.
