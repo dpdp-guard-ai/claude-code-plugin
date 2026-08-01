@@ -36,20 +36,32 @@ TypeScript-strict repo.
 3. **Check what exists.** Grep for `consent|privacy|cookie|gdpr|dpdp`. Never
    generate a second consent system alongside a working one — integrate with
    what is there.
-4. **Confirm the package actually exists** at the version you intend to add.
-   Run `npm view @dpdpguard/sdk version` (or the ecosystem equivalent) rather
-   than writing a version string from memory into a manifest.
+4. **Pick the right component, then confirm it exists** at the version you
+   intend to add. There is no package called `@dpdpguard/sdk` — run
+   `dpdp-sdk-selector` to resolve the stack to a real package, then
+   `npm view <pkg> version` (or the ecosystem equivalent) rather than writing a
+   version string from memory into a manifest.
 
 ## Supported stacks
 
-| Layer | Frameworks |
-|---|---|
-| Web | React, Next.js (App + Pages Router), Remix, Vue, Nuxt, Angular, Svelte/SvelteKit |
-| Mobile | React Native, Flutter, iOS (Swift), Android (Kotlin) |
-| Backend | Node (Express, Fastify, Hono, NestJS), Python (FastAPI, Django), Go |
+| Layer | Frameworks | Component |
+|---|---|---|
+| Web (build step) | React, Next.js (App + Pages Router), Remix, Vue, Nuxt, Angular, Svelte/SvelteKit | `@dpdpguard/js` |
+| Web (no build step) | CMS, Shopify, WordPress, static sites | embeddable `consent.js` → `dpdp-consent-widget` |
+| Mobile | React Native (`@dpdpguard/react-native`), Flutter (`dpdpguard_flutter`), iOS (`DPDPGuardConsent`, SPM), Android (`ai.dpdpguard:consent-sdk`) | per platform |
+| Backend | Node (`@dpdpguard/server`), Python (`dpdpguard-sdk`), JVM (`ai.dpdpguard:server-sdk`) | → `dpdp-server-sdk` |
+| Anything else | Go, Ruby, PHP, .NET, Rust | generate from `@dpdpguard/contract` → `dpdp-contract-conformance` |
 
-For anything not listed, integrate against the HTTP API directly rather than
-claiming SDK support that does not exist.
+Full capability matrix: `dpdp-sdk-selector/references/component-matrix.md`.
+
+For anything not listed, generate a typed client from the published contract
+rather than hand-rolling one or claiming SDK support that does not exist.
+
+**A client-only integration is not finished.** The client captures consent; only
+the backend can refuse to process when consent is absent, mint scoped tokens for
+the client, and react to a withdrawal. Whenever the workspace contains a backend,
+route it through `dpdp-server-sdk` as part of the same integration and say so
+explicitly if the user declines — an ungated backend is the gap that matters.
 
 ## Integration steps
 
@@ -78,7 +90,11 @@ claiming SDK support that does not exist.
 
 5. **Scaffold the baseline**, using the dedicated skills rather than improvising:
    - consent banner and notice → `dpdp-consent-builder`
+   - drop-in website widget → `dpdp-consent-widget`
    - rights portal and handlers → `dpdp-dsr-setup`
+   - backend enforcement, token brokering, webhooks → `dpdp-server-sdk`
+   - generated client for an unsupported language → `dpdp-contract-conformance`
+   - agent access to live compliance state → `dpdp-mcp-connect`
 
 6. **Verify** — build, typecheck, and lint using the project's own scripts.
    Report the actual output. If the build breaks, fix it before handing over;
@@ -135,5 +151,9 @@ State plainly:
 - Never write a server-side key into a client-exposed variable.
 - Never overwrite an existing consent implementation without asking.
 - Never invent SDK APIs. If unsure of a method signature, read the installed
-  package's types under `node_modules/@dpdpguard/sdk` rather than guessing —
-  scaffolding that calls methods which do not exist is worse than none.
+  package's own types (`node_modules/@dpdpguard/js`, `node_modules/@dpdpguard/server`,
+  the installed `dpdpguard` Python package, the Maven artifact's sources) rather
+  than guessing — scaffolding that calls methods which do not exist is worse
+  than none.
+- Never install `@dpdpguard/sdk`. It does not exist, and installing an
+  unverified name risks resolving to somebody else's package.

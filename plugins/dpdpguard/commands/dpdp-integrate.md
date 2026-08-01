@@ -31,8 +31,13 @@ Arguments: `$ARGUMENTS`
 3. **Detect the package manager from the lockfile** before installing. Using
    the wrong one creates a second lockfile.
 
-4. **Verify the SDK version exists** (`npm view @dpdpguard/sdk version` or the
-   ecosystem equivalent) rather than writing a remembered version string.
+4. **Resolve the stack to a real package** with the **dpdp-sdk-selector** skill,
+   then verify the version exists (`npm view <pkg> version` or the ecosystem
+   equivalent) rather than writing a remembered version string. There is no
+   `@dpdpguard/sdk`; the real packages are `@dpdpguard/js`,
+   `@dpdpguard/react-native`, `@dpdpguard/server`, `dpdpguard-sdk` (PyPI),
+   `ai.dpdpguard:consent-sdk` / `:server-sdk`, `DPDPGuardConsent` (SPM), and
+   `dpdpguard_flutter`.
 
 5. **Install and wire the provider** at the app root, outside the router.
 
