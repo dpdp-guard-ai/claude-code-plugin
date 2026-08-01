@@ -203,7 +203,7 @@ Not implemented here — each needs a decision or work outside this repo.
 
 | # | Recommendation | Owner |
 |---|---|---|
-| R1 | **Ship an MCP server entry with the plugin.** `plugin.json` declares `requires.mcp: ["dpdpguard"]` but the plugin provides no `.mcp.json`. Because the surface is per-deployment, this needs either a templated entry `init.js` fills in from the tenant URL, or a documented `claude mcp add` step. `dpdp-mcp-connect` documents the manual path today. | plugin |
+| ~~R1~~ | ~~**Ship an MCP server entry with the plugin.**~~ **Done** — `plugins/dpdpguard/.mcp.json` registers the server at `${DPDPGUARD_TENANT_URL}/mcp/v1`, using the `${VAR}` expansion Claude Code supports in an HTTP server's `url`. That solves the per-deployment problem without `init.js` writing files. See "OAuth login" below. | plugin |
 | R2 | **`bin/audit-ci.js` is a placeholder** while `action.yml` and `package.json` both expose it as `dpdpguard-audit`. A GitHub Action that no-ops is worse than one that does not exist. Either implement it against the `dpdp-audit` rule catalog or remove the binding. | plugin |
 | R3 | **Reconcile `.dpdpguard.yaml` with the platform's own config.** The plugin's `organization.id`, `isSignificantDataFiduciary`, and `consent.supported_locales` duplicate state the platform already holds and can serve via `org_profile_get`. Prefer reading from the tenant over asking the user to restate it, and treat the file as local overrides. | plugin + platform |
 | R4 | **Telemetry defaults on.** `.dpdpguard.yaml` ships `telemetry.enabled: true`. The skills disclose it at write time, which is the right behaviour, but a privacy-compliance tool defaulting outbound telemetry to on invites the obvious objection in exactly the security review this product is sold into. Recommend defaulting to `false`. | plugin |
@@ -211,7 +211,59 @@ Not implemented here — each needs a decision or work outside this repo.
 | R6 | **Widen `pii-commit-guard.sh` to DPDP Guard credential prefixes.** The hook should treat `dpdpg_live_` and `dpdpg_agent_` as blocking patterns. The platform chose distinct prefixes precisely so a leaked key is identifiable on sight; the plugin should use that. | plugin |
 | R7 | **`/cm/v1/consent` has no stable error `code`.** The `/api/v1` slice has a machine-readable catalog and the older CM slice does not, so a client spanning both cannot branch uniformly. Tracked upstream as a breaking-change follow-up; worth prioritising, since it is the slice a partner integration hits first. | platform |
 | R8 | **Publish the MCP tool catalog as a versioned artifact.** `openapi/mcp-v1.tools.json` is the source of truth for names, risk classes, and scopes, but only `/api/v1` ships in `@dpdpguard/contract`. Publishing the catalog the same way would let this plugin pin a `catalogVersion` instead of restating tool names in prose — which is exactly how G2 happened. | platform |
+| R10 | **The SPA consent screen is the remaining gap in the OAuth flow.** `/mcp/v1/oauth/authorize` validates the request and redirects to `/dashboard/fiduciary/agent-access/authorize`, which does not exist yet. The backend behind it (`describeAuthorizationRequest`, `createAuthorizationCode`) is built and tested; the page that calls them is not. Until it ships, the redirect lands on a 404 and no code is minted. | platform |
+| R11 | **Security review is a merge gate for the agent surface, not a follow-up.** ADR-007 D6 names seven hardening controls (rate limit, per-org cap, 24h GC of unauthorized registrations, no secrets over an unauthenticated endpoint, redirect-URI allowlist validation at both registration and authorization, console visibility, spike alerting). The per-org cap and redirect-URI validation are implemented; rate limiting, GC of stale authorization codes, and spike alerting are not. | platform |
+| R12 | **`dpdp_mcp_surface_enabled` defaults off and `apiKeys.create` is gated by `dpdp_cm_api_enabled`.** Together these mean no customer can reach the agent surface or mint an agent key today, whatever else is built. Enabling the surface is a product decision that needs to happen for any of this to be reachable. | platform |
 | R9 | **Consider a `dpdp-dpia` skill.** The platform models DPIA programs, vendor assessments, cross-border transfer registries, and significant-data-fiduciary readiness. The plugin covers none of it, and SDF obligations are the highest-consequence slice of the Act for the platform's larger customers. | plugin |
+
+## OAuth login for the agent surface
+
+A follow-up review of ADR-007 D2's delegated-grant half found it **specified and
+partly scaffolded, but not connectable**. Three independent reasons, all
+verified in `dpdpbot` rather than taken from the ADR:
+
+- `convex/lib/agentAuth.ts` accepted only `dpdpg_agent_` keys. `actorKind:
+  "delegated"` was declared in the return type and never produced; the
+  `agentSessions` table was never queried.
+- No OAuth routes were mounted. `convex/http.ts` carried `/mcp/v1` (POST, GET,
+  OPTIONS) and nothing else — no discovery documents, no `/authorize`, no
+  `/token`, no `/oauth/register`. `mcpOAuth.dcrHandler` existed but was
+  referenced nowhere.
+- Nothing ever inserted an `agentGrants` row. The platform's own marketing copy
+  had already audited this and declined to claim the capability publicly.
+
+This mattered directly: `dpdp-mcp-connect` recommended the delegated grant as
+the preferred path for interactive sessions, which was pointing users at a flow
+that could not complete.
+
+**Both halves are now built.**
+
+On the platform (`dpdpbot`): a `agentAuthCodes` table, the twelve-family scope
+vocabulary with ADR-007 D2's role intersection (`convex/lib/agentScopes.ts`),
+PKCE verification (`convex/lib/pkce.ts`, checked against RFC 7636 Appendix B's
+canonical vector), the authorization-code and refresh grants with rotation, RFC
+9728 and RFC 8414 discovery documents, RFC 7009 revocation, and the
+`WWW-Authenticate` header on 401 that makes client-side discovery work at all.
+`resolveAgentCredential` now resolves delegated sessions, re-intersecting scopes
+against the profile's **current** role on every request so a role change takes
+effect immediately rather than at refresh time.
+
+On the plugin: `.mcp.json`, plus a rewritten connection section in
+`dpdp-mcp-connect`.
+
+Two things are worth stating plainly about the platform work:
+
+- **Claude Code implements the client half.** It flags a server on 401,
+  discovers the authorization server from `WWW-Authenticate`, self-registers via
+  DCR, runs the flow, and refreshes tokens. No OAuth client code was written or
+  needed.
+- **It has not been exercised against a live tenant.** The flow is covered by
+  unit and `convex-test` integration tests, including replay, PKCE failure,
+  refresh rotation, role downgrade, cross-org client rejection, and the kill
+  switch. A real browser round-trip against a deployed tenant has not been run,
+  and ADR-007 D6 puts this behind seven named hardening controls with
+  security-review sign-off as a merge gate. Neither the review nor the
+  SPA consent screen is done — see R10 and R11.
 
 ## What the plugin gets right, and should keep
 
