@@ -36,13 +36,13 @@
   ],
   "author": "DPDPGuard Team <support@dpdpguard.com>",
   "license": "MIT",
-  "homepage": "https://github.com/dpdpguard/claude-code-plugin#readme",
+  "homepage": "https://github.com/dpdp-guard-ai/claude-code-plugin#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dpdpguard/claude-code-plugin.git"
+    "url": "git+https://github.com/dpdp-guard-ai/claude-code-plugin.git"
   },
   "bugs": {
-    "url": "https://github.com/dpdpguard/claude-code-plugin/issues"
+    "url": "https://github.com/dpdp-guard-ai/claude-code-plugin/issues"
   },
   "engines": {
     "node": ">=20"
