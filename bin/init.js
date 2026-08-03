@@ -49,11 +49,14 @@ mcp:
   api_url: ""
 
 telemetry:
-  enabled: true
+  # Off by default. A privacy-compliance tool that ships outbound telemetry
+  # enabled is the first thing a security review objects to. Opt in explicitly
+  # if you want to contribute anonymised rule-hit metrics.
+  enabled: false
 `;
   fs.writeFileSync(configPath, defaultConfig);
   console.log('✅ Created .dpdpguard.yaml configuration');
 }
 
 console.log('✅ DPDPGuard Claude Code Plugin initialized successfully!');
-console.log('📊 Telemetry Notice: DPDPGuard collects anonymized usage metrics (rule hit rates). Disable in .dpdpguard.yaml or DPDPGUARD_TELEMETRY=false');
+console.log('📊 Telemetry Notice: telemetry is DISABLED by default. Set telemetry.enabled: true in .dpdpguard.yaml to contribute anonymized rule-hit metrics.');

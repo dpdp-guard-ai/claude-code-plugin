@@ -11,6 +11,7 @@
  * `import.meta.main`.
  */
 
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -32,7 +33,11 @@ export interface ParsedDoc {
  * documents: scalar values and block sequences. Deliberately dependency-free —
  * this runs in CI before anything is installed.
  */
-export function parseFrontmatter(source: string, file = '<memory>'): ParsedDoc {
+export function parseFrontmatter(rawSource: string, file = '<memory>'): ParsedDoc {
+  // A CRLF checkout (Windows, core.autocrlf=true) must not fail every document.
+  // .gitattributes pins LF, but the parser should not depend on checkout config.
+  const source = rawSource.replace(/\r\n/g, '\n');
+
   if (!source.startsWith('---\n')) {
     throw new Error(`${file}: missing YAML frontmatter (file must start with '---')`);
   }
@@ -114,6 +119,36 @@ export function hookScripts(plugin: string): string[] {
     .filter((f) => f.endsWith('.sh'))
     .map((f) => path.join(dir, f))
     .sort();
+}
+
+/**
+ * Whether a hook script will be executable where it matters.
+ *
+ * Windows has no POSIX permission bits, so `stat().mode` reports every file as
+ * non-executable and the rule would fire on every hook. Git tracks the mode
+ * separately, and the index mode is what a POSIX checkout actually applies —
+ * so consult that instead. Falls back to passing when neither source can
+ * answer (untracked file, or no git), since CI enforces this on ubuntu.
+ */
+export function isExecutable(script: string): boolean {
+  if (process.platform !== 'win32') {
+    try {
+      return (fs.statSync(script).mode & 0o111) !== 0;
+    } catch {
+      return true; // stat failure is reported elsewhere
+    }
+  }
+
+  try {
+    const entry = execFileSync('git', ['ls-files', '--stage', '--', script], {
+      cwd: projectRoot,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+    return entry === '' || entry.startsWith('100755');
+  } catch {
+    return true;
+  }
 }
 
 // --- rules -----------------------------------------------------------------
@@ -294,12 +329,8 @@ export function validate(): Issue[] {
         err(script, 'hook scripts must be POSIX sh, not bash (CLAUDE.md rule 2)');
       }
 
-      try {
-        if (!(fs.statSync(script).mode & 0o111)) {
-          err(script, 'hook script is not executable (chmod +x)');
-        }
-      } catch {
-        /* stat failure is reported elsewhere */
+      if (!isExecutable(script)) {
+        err(script, 'hook script is not executable (chmod +x)');
       }
 
       for (const [pattern, message] of BASHISMS) {

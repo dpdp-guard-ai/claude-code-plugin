@@ -5,6 +5,7 @@ import path from 'node:path';
 
 import {
   REQUIRED_KEYS,
+  isExecutable,
   listPlugins,
   markdownFiles,
   parseFrontmatter,
@@ -150,8 +151,9 @@ describe('pii-commit-guard hook', () => {
     }
   }
 
+  // Checks the git index mode on Windows, where there are no permission bits.
   test('is executable', () => {
-    expect(fs.statSync(hook).mode & 0o111).toBeGreaterThan(0);
+    expect(isExecutable(hook)).toBe(true);
   });
 
   test('allows commands that are not commits', async () => {
@@ -182,6 +184,24 @@ describe('pii-commit-guard hook', () => {
     });
     expect(result.code).toBe(2);
     expect(result.stderr).toContain('private key');
+  });
+
+  test('blocks a DPDPGuard service key', async () => {
+    const result = await runGuard('git commit -m key', {
+      name: 'config.js',
+      content: 'const client = init("dpdpg_live_8fK2mQ7xR4tZ9wB1nL5c");\n',
+    });
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('DPDPGuard credential');
+  });
+
+  test('blocks a DPDPGuard agent key', async () => {
+    const result = await runGuard('git commit -m key', {
+      name: '.mcp.json',
+      content: '{ "token": "dpdpg_agent_3vT8pW2yH6kD0sJ4qX7b" }\n',
+    });
+    expect(result.code).toBe(2);
+    expect(result.stderr).toContain('DPDPGuard credential');
   });
 
   test('blocks an Aadhaar-shaped literal', async () => {
@@ -229,5 +249,147 @@ describe('pii-commit-guard hook', () => {
       stderr: 'ignore',
     });
     expect(await proc.exited).toBe(0);
+  });
+});
+
+describe('CI auditor', () => {
+  const auditor = path.join(projectRoot, 'bin/audit-ci.js');
+
+  /** Run the auditor over a throwaway tree, returning its exit code and stdout. */
+  async function runAudit(
+    files: Record<string, string>,
+    env: Record<string, string> = {},
+  ) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dpdpguard-audit-'));
+    try {
+      for (const [name, content] of Object.entries(files)) {
+        const target = path.join(dir, name);
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.writeFileSync(target, content);
+      }
+
+      const proc = Bun.spawn(['node', auditor, dir], {
+        env: { ...process.env, ...env },
+        stdout: 'pipe',
+        stderr: 'pipe',
+      });
+      const stdout = await new Response(proc.stdout).text();
+      return { code: await proc.exited, stdout };
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  test('passes on a clean tree', async () => {
+    const result = await runAudit({ 'ok.js': 'export const sum = (a, b) => a + b;\n' });
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain('0 candidate(s)');
+  });
+
+  // CLAUDE.md: never state that an organisation "is compliant" — that is a
+  // regulator's determination. Any sentence mentioning compliance must negate.
+  test('never reports a clean run as compliant', async () => {
+    const result = await runAudit({ 'ok.js': 'export const x = 1;\n' });
+    expect(result.stdout).toContain('does not establish that an organisation is compliant');
+
+    const claims = result.stdout
+      .split(/(?<=\.)\s+/)
+      .filter((sentence) => /\bcompliant\b/i.test(sentence))
+      .filter((sentence) => !/\bnot\b/i.test(sentence));
+    expect(claims).toEqual([]);
+  });
+
+  test('discloses that it executes a subset of the catalog', async () => {
+    const result = await runAudit({ 'ok.js': 'export const x = 1;\n' });
+    expect(result.stdout).toContain('of the 26 rules');
+    expect(result.stdout).toContain('/dpdp-audit');
+  });
+
+  test('DPDP-A01 — personal data in logs', async () => {
+    const result = await runAudit({ 'a.js': 'console.log("user " + u.email);\n' });
+    expect(result.stdout).toContain('DPDP-A01');
+    expect(result.code).toBe(1);
+  });
+
+  test('DPDP-A02 — personal data in a query parameter', async () => {
+    const result = await runAudit({ 'a.js': 'fetch("/api/u?email=" + e);\n' });
+    expect(result.stdout).toContain('DPDP-A02');
+  });
+
+  test('DPDP-A05 — hardcoded credential and DPDPGuard key prefixes', async () => {
+    const result = await runAudit({
+      'a.js': 'const k = "sk-abcdefghijklmnop1234";\nconst s = "dpdpg_agent_3vT8pW2yH6kD0sJ4qX7b";\n',
+    });
+    expect(result.stdout).toContain('DPDP-A05');
+    expect(result.stdout).toContain('a.js:1');
+    expect(result.stdout).toContain('a.js:2');
+  });
+
+  test('DPDP-F01 — plaintext transport, but not localhost', async () => {
+    const bad = await runAudit({ 'a.js': 'const u = "http://api.example.com";\n' });
+    expect(bad.stdout).toContain('DPDP-F01');
+
+    const dev = await runAudit({ 'a.js': 'const u = "http://localhost:3000";\n' });
+    expect(dev.stdout).not.toContain('DPDP-F01');
+  });
+
+  test('DPDP-F02 — reversible password storage', async () => {
+    const result = await runAudit({ 'a.js': 'const h = md5(password);\n' });
+    expect(result.stdout).toContain('DPDP-F02');
+  });
+
+  test('ignores placeholder credentials', async () => {
+    const result = await runAudit({ 'a.js': 'const api_key = "your_api_key_here";\n' });
+    expect(result.code).toBe(0);
+  });
+
+  test('honours the dpdpguard:allow escape hatch', async () => {
+    const result = await runAudit({ 'a.js': 'console.log(u.email); // dpdpguard:allow\n' });
+    expect(result.code).toBe(0);
+  });
+
+  test('skips credentials in .example files', async () => {
+    const result = await runAudit({ '.env.example': 'API_KEY="sk-abcdefghijklmnop1234"\n' });
+    expect(result.stdout).not.toContain('DPDP-A05');
+  });
+
+  test('does not scan documentation', async () => {
+    const result = await runAudit({ 'README.md': 'console.log(user.email)\n' });
+    expect(result.code).toBe(0);
+  });
+
+  test('fail-on never reports without failing the build', async () => {
+    const result = await runAudit(
+      { 'a.js': 'console.log(u.email);\n' },
+      { 'INPUT_FAIL-ON': 'never' },
+    );
+    expect(result.stdout).toContain('DPDP-A01');
+    expect(result.code).toBe(0);
+  });
+
+  test('fail-on critical does not block a high-severity candidate', async () => {
+    const result = await runAudit(
+      { 'a.js': 'fetch("/api/u?email=" + e);\n' },
+      { 'INPUT_FAIL-ON': 'critical' },
+    );
+    expect(result.stdout).toContain('DPDP-A02');
+    expect(result.code).toBe(0);
+  });
+
+  test('honours exclude_paths from .dpdpguard.yaml', async () => {
+    const result = await runAudit({
+      '.dpdpguard.yaml': 'audit:\n  exclude_paths:\n    - "generated/"\n',
+      'generated/a.js': 'console.log(u.email);\n',
+    });
+    expect(result.code).toBe(0);
+  });
+
+  test('says so loudly when no rule matches the requested regulations', async () => {
+    const result = await runAudit(
+      { 'a.js': 'console.log(u.email);\n' },
+      { INPUT_REGULATIONS: 'ccpa' },
+    );
+    expect(result.stdout).toContain('Nothing was scanned');
+    expect(result.code).toBe(0);
   });
 });

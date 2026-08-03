@@ -197,6 +197,79 @@ The generated `.dpdpguard.yaml` listed nine `supported_locales` by default,
 contradicting the plugin's own guidance that a switcher must offer only
 genuinely translated languages. Defaulted to `["en"]`.
 
+### G14 — `pii-commit-guard.sh` failed open on any machine without a working `jq` or `python3` · **fixed**
+
+Found while implementing R6. The hook read the PreToolUse payload by branching
+once on `command -v`:
+
+```sh
+if command -v jq …; elif command -v python3 …; else <sed fallback>; fi
+```
+
+On Windows without `jq`, `python3` resolves to the Microsoft Store alias. It
+satisfies `command -v`, prints an install notice to stderr, and exits non-zero
+without writing to stdout. The `elif` branch was therefore taken, `COMMAND`
+came back empty, and the deliberate fail-open two lines later
+(`[ -n "$COMMAND" ] || exit 0`) turned the guard into a silent no-op. The
+`sed` fallback was unreachable in exactly the case it exists for.
+
+The fail-open itself is right — a guard that cannot parse its input must not
+brick every Bash call. The bug was reaching it while a working extraction
+method was still untried.
+
+**Fixed:** each method now runs in turn and its *output* is checked, so an
+interpreter that exists but does not work falls through to the next. This is
+what the seven previously-failing hook tests were reporting; all 70 now pass.
+
+Worth noting for whoever picks up R2: this failure mode is invisible in CI.
+Ubuntu runners have a working `python3`, so the hook tests passed there while
+the hook did nothing on a contributor's machine.
+
+### G15 — the repo's own checks could not run on a Windows checkout · **fixed**
+
+`bun run validate` reported 24 errors and `bun test` failed 55 of 68 on a clean
+tree. Nothing was wrong with the repo: with `core.autocrlf=true` and no
+`.gitattributes`, every file checked out CRLF, and
+
+- `parseFrontmatter` matched a literal `---\n`, so every skill, command and
+  agent failed as "missing YAML frontmatter";
+- `hooks/*.sh` got a `#!/bin/sh\r` shebang, so `/bin/sh` could not run them;
+- the `chmod +x` check read `stat().mode`, which has no meaning on Windows.
+
+CI is ubuntu-only and never saw any of it. The practical effect is that a
+Windows contributor cannot tell a real failure from an environmental one, and
+the local checks stop being run.
+
+**Fixed:** `.gitattributes` pins LF; `parseFrontmatter` normalises CRLF rather
+than depending on checkout config; and the executable check consults the git
+index mode on Windows, so the rule still holds there instead of being skipped.
+
+### G16 — CI was red on `master`, and had been since the last devDependency bump · **fixed**
+
+Found while trying to run `bun run lint` locally. `package.json` pinned
+`@commitlint/config-conventional: ^21.2.1`, a version that does not exist —
+`@commitlint/cli` reached `21.2.1` but `config-conventional` stops at `21.2.0`,
+and both were bumped to the CLI's number. `bun.lock` still recorded the
+pre-bump `^19.6.x` specifiers, so it had never been regenerated against the new
+range either.
+
+Every CI job — validate, test, lint, commitlint — begins with
+`bun install --frozen-lockfile`, so all four failed before running anything.
+The failure is also self-concealing: it takes out the lint job, so the two
+checks that depend on installed binaries (`markdownlint`, and `shellcheck`
+via apt) had not run in some time.
+
+Unblocking the install surfaced a second failure behind it: the same commit
+bumped `markdownlint-cli` to `0.49.1`, which added **MD060**
+(`table-column-style`). It fires 296 times across 19 files on the repo's
+`|---|---|` delimiter rows. Reformatting every table would put cosmetic churn
+through every compliance document and bury real edits in review, so MD060 is
+disabled in `.markdownlint.json` rather than satisfied.
+
+**Fixed:** specifier corrected to `^21.2.0`, lockfile regenerated, MD060
+disabled. `bun install --frozen-lockfile`, `validate`, `test`, `lint` and
+`sync:codex:check` all pass.
+
 ## Open recommendations
 
 Not implemented here — each needs a decision or work outside this repo.
@@ -204,11 +277,11 @@ Not implemented here — each needs a decision or work outside this repo.
 | # | Recommendation | Owner |
 |---|---|---|
 | ~~R1~~ | ~~**Ship an MCP server entry with the plugin.**~~ **Done** — `plugins/dpdpguard/.mcp.json` registers the server at `${DPDPGUARD_TENANT_URL}/mcp/v1`, using the `${VAR}` expansion Claude Code supports in an HTTP server's `url`. That solves the per-deployment problem without `init.js` writing files. See "OAuth login" below. | plugin |
-| R2 | **`bin/audit-ci.js` is a placeholder** while `action.yml` and `package.json` both expose it as `dpdpguard-audit`. A GitHub Action that no-ops is worse than one that does not exist. Either implement it against the `dpdp-audit` rule catalog or remove the binding. | plugin |
+| ~~R2~~ | ~~**`bin/audit-ci.js` is a placeholder**~~ **Done** — implemented against the pattern-matchable subset of the catalog: `DPDP-A01`, `A02`, `A05`, `F01`, `F02`. The other 21 rules need code read in context and stay in the skill. The tool states its own coverage in every run, reports **candidates rather than findings** (the catalog's confirmation step has not been performed), and never presents a clean run as compliance. Honours `dpdpguard:allow`, `fail-on`, and `audit.exclude_paths`. | plugin |
 | R3 | **Reconcile `.dpdpguard.yaml` with the platform's own config.** The plugin's `organization.id`, `isSignificantDataFiduciary`, and `consent.supported_locales` duplicate state the platform already holds and can serve via `org_profile_get`. Prefer reading from the tenant over asking the user to restate it, and treat the file as local overrides. | plugin + platform |
-| R4 | **Telemetry defaults on.** `.dpdpguard.yaml` ships `telemetry.enabled: true`. The skills disclose it at write time, which is the right behaviour, but a privacy-compliance tool defaulting outbound telemetry to on invites the obvious objection in exactly the security review this product is sold into. Recommend defaulting to `false`. | plugin |
+| ~~R4~~ | ~~**Telemetry defaults on.**~~ **Done** — `bin/init.js` now writes `telemetry.enabled: false`, and the init notice states that telemetry is off rather than describing how to disable it. | plugin |
 | R5 | **The audit skill and `posture_gaps_list` are unconnected.** `/dpdp-audit` computes a local composite score from static findings; the platform computes its own posture score and a unified gap list. Two scores that disagree will be noticed. Recommend the audit report cite the live posture score alongside the static one when MCP is configured, and never present the static one as the organisation's compliance posture. | plugin |
-| R6 | **Widen `pii-commit-guard.sh` to DPDP Guard credential prefixes.** The hook should treat `dpdpg_live_` and `dpdpg_agent_` as blocking patterns. The platform chose distinct prefixes precisely so a leaked key is identifiable on sight; the plugin should use that. | plugin |
+| ~~R6~~ | ~~**Widen `pii-commit-guard.sh` to DPDP Guard credential prefixes.**~~ **Done** — `dpdpg_(live\|test\|agent)_` is now a blocking pattern with its own finding message. See G14 below: implementing this surfaced that the hook was failing open on a large class of machines, so the pattern would not have fired anyway. | plugin |
 | R7 | **`/cm/v1/consent` has no stable error `code`.** The `/api/v1` slice has a machine-readable catalog and the older CM slice does not, so a client spanning both cannot branch uniformly. Tracked upstream as a breaking-change follow-up; worth prioritising, since it is the slice a partner integration hits first. | platform |
 | R8 | **Publish the MCP tool catalog as a versioned artifact.** `openapi/mcp-v1.tools.json` is the source of truth for names, risk classes, and scopes, but only `/api/v1` ships in `@dpdpguard/contract`. Publishing the catalog the same way would let this plugin pin a `catalogVersion` instead of restating tool names in prose — which is exactly how G2 happened. | platform |
 | R13 | **`@dpdpguard/server` 2.0.0 exports `VERSION = "0.1.0"`.** A stale constant. It matters only if something reports it in the `X-DPDP-SDK` header, where it would misidentify the client against `convex/lib/sdkVersioning.ts`'s floors — which are inert today because no SDK sends the header yet, so this is cheap to fix now and confusing later. | sdk-node |

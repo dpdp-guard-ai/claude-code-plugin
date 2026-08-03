@@ -1,0 +1,20 @@
+# Line endings are load-bearing in this repo, not cosmetic:
+#
+#   - hooks/*.sh are executed by /bin/sh. A CRLF shebang makes the interpreter
+#     look for "/bin/sh\r" and the hook fails to run at all.
+#   - scripts/validate-plugin.ts parses frontmatter by matching a literal
+#     "---\n", so a CRLF checkout fails every skill, command and agent.
+#
+# CI runs on ubuntu and never sees either problem. Pinning LF here keeps a
+# Windows checkout (core.autocrlf=true) able to run `bun run validate` and
+# `bun test` locally.
+* text=auto eol=lf
+
+*.sh   text eol=lf
+*.ts   text eol=lf
+*.js   text eol=lf
+*.json text eol=lf
+*.md   text eol=lf
+*.yml  text eol=lf
+
+bun.lock text eol=lf
