@@ -7,14 +7,25 @@
     "dpdpguard-init": "bin/init.js",
     "dpdpguard-audit": "bin/audit-ci.js"
   },
+  "files": [
+    "bin/",
+    "plugins/",
+    "scripts/sync-codex.ts",
+    "action.yml",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "lint": "markdownlint '**/*.md' --ignore node_modules",
     "lint:shell": "shellcheck plugins/*/hooks/*.sh",
+    "validate": "bun run scripts/validate-plugin.ts",
     "test": "bun test",
-    "sync:codex": "bun run scripts/sync-codex.ts"
+    "sync:codex": "bun run scripts/sync-codex.ts",
+    "sync:codex:check": "bun run scripts/sync-codex.ts --check"
   },
   "keywords": [
     "claude-code-plugin",
+    "claude-code",
     "dpdp-act",
     "gdpr",
     "ccpa",
@@ -25,9 +36,20 @@
   ],
   "author": "DPDPGuard Team <support@dpdpguard.com>",
   "license": "MIT",
+  "homepage": "https://github.com/dpdp-guard-ai/claude-code-plugin#readme",
   "repository": {
-    "url": "https://github.com/dpdp-guard-ai/claude-code-plugin",
-    "type": "git"
+    "type": "git",
+    "url": "git+https://github.com/dpdp-guard-ai/claude-code-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/dpdp-guard-ai/claude-code-plugin/issues"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
   },
   "devDependencies": {
     "@commitlint/cli": "^21.2.1",

@@ -8,17 +8,29 @@
     "agents_dir": "agents"
   },
   "requires": {
-    "tools": ["shell", "file_read", "file_write"],
-    "mcp": ["dpdpguard"]
+    "tools": [
+      "file_read",
+      "file_write",
+      "shell"
+    ],
+    "mcp": [
+      "dpdpguard"
+    ]
   },
   "compatibility": {
     "min_codex_version": "0.1.0",
-    "supported_runtimes": ["node", "bun"]
+    "supported_runtimes": [
+      "node",
+      "bun"
+    ]
   },
   "codex_specific": {
-    "sandbox_policy": "relaxed",
-    "auto_approve_tools": ["shell", "file_read"]
+    "sandbox_policy": "workspace-write",
+    "auto_approve_tools": [
+      "file_read",
+      "file_search"
+    ]
   },
   "generated_from": ".claude-plugin/plugin.json",
-  "generated_at": "sync-codex"
+  "source_checksum": "sha256:ffdbe70d08c9c974dfafcd62280df1d71f3d14b1a293a711585ecd2bd9cc0902"
 }
