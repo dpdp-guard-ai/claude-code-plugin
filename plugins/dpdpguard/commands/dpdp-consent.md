@@ -33,7 +33,9 @@ Arguments: `$ARGUMENTS`
 
 4. **Collect the notice facts**: fiduciary legal name, registered address,
    grievance officer contact, retention period per purpose, and whether data
-   leaves India. For anything the user cannot supply, emit an explicit
+   leaves India. Resolve them tenant-first (`org_profile_get`), then
+   `.dpdpguard.yaml`, then the user — do not ask the user to restate what the
+   tenant already holds. For anything no source supplies, emit an explicit
    `TODO(dpdp):` marker — never plausible filler.
 
 5. **Generate** the consent state module, banner + preference centre, and the

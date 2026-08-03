@@ -96,6 +96,13 @@ destinations. Suggested commands only — the operator runs them.
 Build the payload from `references/dpb-intimation-template.md`. Fill only what
 is known; leave explicit `UNKNOWN — under investigation` for the rest.
 
+The `fiduciary` block — legal name, registered address, DPO contact,
+`isSignificantDataFiduciary` — is organisation identity, not incident detail.
+Resolve it tenant-first via `org_profile_get` (see *Resolving organisation
+facts* in `dpdp-mcp-connect`) rather than asking an operator mid-incident to
+recall the registered address. Never transcribe it from memory into a
+regulator filing.
+
 An initial filing with honest gaps is expected and is better than a late filing
 or a confident-sounding guess. Do not fabricate a record count, a root cause,
 or a containment time to make the form look complete.

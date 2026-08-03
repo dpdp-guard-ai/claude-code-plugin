@@ -106,11 +106,14 @@ Generate `.dpdpguard.yaml` if absent:
 
 ```yaml
 version: 2
+
+# Tenant-authoritative when MCP is configured — read via org_profile_get.
+# Fill in only for offline work.
 organization:
   id: ""
   name: ""
   sector: ""
-  isSignificantDataFiduciary: false      # affects DPO and DPIA obligations
+  isSignificantDataFiduciary: false      # gates DPO, DPIA, audit — DPDP §10
 
 regulations: [dpdp, gdpr, ccpa, pdpa]
 
@@ -124,8 +127,14 @@ consent:
   supported_locales: [en]                # only locales actually translated
 
 telemetry:
-  enabled: true                          # anonymised rule-hit metrics
+  enabled: false                         # opt in to anonymised rule-hit metrics
 ```
+
+The `organization` block and `consent.supported_locales` duplicate state the
+tenant already holds. Do not ask the user to restate them when MCP is
+configured, and do not cache tenant values back into the file — see
+*Resolving organisation facts* in `dpdp-mcp-connect`. `audit.*`, `regulations`
+and `telemetry` are genuinely local and belong here.
 
 Set `supported_locales` to what is genuinely translated. Listing 22 locales
 that fall back to English creates a misleading language switcher.

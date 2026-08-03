@@ -15,10 +15,19 @@ console.log('🛡️ Initializing DPDPGuard Claude Code Plugin...');
 const configPath = path.join(cwd, '.dpdpguard.yaml');
 if (!fs.existsSync(configPath)) {
   const defaultConfig = `version: 2
+
+# The tenant is authoritative for organisation identity. When MCP is
+# configured, these are read from org_profile_get — the credential is already
+# org-scoped, so there is nothing to restate here. Fill them in only for
+# offline work, and expect the plugin to surface any divergence rather than
+# silently preferring one side.
 organization:
   id: ""
-  name: "My App"
-  sector: "technology"
+  name: ""
+  sector: ""
+  # Gates DPO appointment, DPIA and independent audit under DPDP §10. If this
+  # disagrees with the tenant, every artefact built from it targets the wrong
+  # obligation set.
   isSignificantDataFiduciary: false
 
 regulations:
@@ -39,7 +48,8 @@ audit:
 consent:
   default_locale: "en"
   # List only locales that are genuinely translated. A switcher offering a
-  # language that silently falls back to English is misleading.
+  # language that silently falls back to English is misleading. Also held by
+  # the tenant; the tenant wins when both are present.
   supported_locales: ["en"]
 
 mcp:

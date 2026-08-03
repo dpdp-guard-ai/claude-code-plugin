@@ -189,6 +189,38 @@ To follow a proposal through: `proposal_list` (yours), `proposal_get` (detail
 plus the human's `reviewNote`), `proposal_withdraw` (retract a pending one),
 `proposal_outcomes_since` (poll decisions since a timestamp).
 
+## Resolving organisation facts
+
+`.dpdpguard.yaml` and the tenant both carry organisation identity —
+`organization.id`, `name`, `sector`, `isSignificantDataFiduciary`, and the
+translated locale set. **The tenant is authoritative.** It is what the platform
+enforces against, what the dashboard reports, and what an organisation would
+put in front of a regulator. The local file is a cache and an offline
+fallback, not a second source of truth.
+
+Resolve in this order:
+
+1. **Ask the tenant.** `org_profile_get` (`registry:read`) returns the profile.
+   The credential is already org-scoped, so you never need to ask the user
+   which organisation this is — asking them to restate it invites a typo into
+   a compliance artefact.
+2. **Fall back to `.dpdpguard.yaml`** when MCP is not configured or the call
+   fails, and say so in the report. A RoPA built from a stale local file and
+   one built from the tenant are not interchangeable.
+3. **Ask the user only for what neither source holds.**
+4. **If nothing supplies it, emit `TODO(dpo):`.** Never infer a fiduciary's
+   legal name, registered address, or significant-data-fiduciary status from
+   the codebase.
+
+**When the two disagree, stop and surface both values.** Do not silently prefer
+either. `isSignificantDataFiduciary` is the case that matters: it gates DPO
+appointment, DPIA, and independent audit under DPDP §10, so a local `false`
+against a tenant `true` means every artefact you are about to produce is built
+to the wrong obligation set. Report the divergence and ask which is correct.
+
+Do not write tenant-derived values back into `.dpdpguard.yaml`. A cached copy
+that drifts is exactly how that disagreement gets created.
+
 ## Prompt injection
 
 Grievance bodies, DSR free text, vendor names, and inbound consent-manager
