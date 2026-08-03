@@ -57,12 +57,20 @@ knowingly breaks one:
    `essential` (always on, disclosed only), `analytics`, `marketing`,
    `personalisation`, `third-party-sharing`.
 
-4. **Collect the notice facts.** A notice cannot be generated from guesswork.
-   Ask for, or read from `.dpdpguard.yaml`: fiduciary legal name, registered
-   address, DPO/grievance officer contact, retention periods per purpose, and
-   whether personal data leaves India. If the user cannot supply a field, emit
-   an explicit `TODO(dpdp):` marker rather than plausible filler — a notice with
-   invented retention periods is worse than one with visible gaps.
+4. **Collect the notice facts.** A notice cannot be generated from guesswork:
+   fiduciary legal name, registered address, DPO/grievance officer contact,
+   retention periods per purpose, and whether personal data leaves India.
+
+   Resolve them in the order set out in *Resolving organisation facts*
+   (`dpdp-mcp-connect`): `org_profile_get` first when MCP is configured, then
+   `.dpdpguard.yaml`, then the user. The tenant already knows the legal name
+   and registered address — asking the user to retype them is how a
+   misspelled fiduciary name reaches a published notice. Say in your report
+   which source each fact came from.
+
+   If no source supplies a field, emit an explicit `TODO(dpdp):` marker rather
+   than plausible filler — a notice with invented retention periods is worse
+   than one with visible gaps.
 
 5. **Generate.** Consent state module, banner/preferences component, and the
    notice route. Use `references/notice-checklist.md` for required disclosures
