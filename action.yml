@@ -1,5 +1,5 @@
 name: "DPDPGuard Multi-Regulation Privacy Compliance Audit"
-description: "Audit pull requests and codebases for privacy violations across DPDP Act 2023, GDPR, CCPA, and PDPA."
+description: "Scan a codebase for the pattern-matchable privacy rules in the DPDPGuard audit catalog (5 of 26: PII in logs and URLs, hardcoded credentials, plaintext transport, weak password storage). Reports candidates requiring confirmation, not a compliance determination."
 author: "DPDPGuard Team"
 inputs:
   regulations:

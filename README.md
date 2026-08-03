@@ -68,7 +68,7 @@ maps onto the DPDP Guard platform's actual SDK, API, and agent surfaces.
 └── publish.yml                   # npm Trusted Publishing (OIDC)
 bin/
 ├── init.js                       # npx initializer
-└── audit-ci.js                   # CI auditor entrypoint (placeholder)
+└── audit-ci.js                   # CI auditor — the grep-able 5 of 26 catalog rules
 scripts/
 ├── sync-codex.ts                 # generates Codex artefacts, deterministically
 └── validate-plugin.ts            # enforces the CLAUDE.md structural rules
@@ -118,11 +118,33 @@ before it publishes. Provenance attestation is attached automatically.
 
 ## Status
 
-`bin/audit-ci.js` is currently a **placeholder** — it does not execute the rule
-catalog, and the GitHub Action built on it should not be treated as a
-compliance gate yet. The detection logic today lives in the skills, which run
-inside Claude Code. The remote rule registry at `rules.dpdpguard.com` is not
-yet wired up.
+`bin/audit-ci.js` executes **5 of the 26 rules** in the audit catalog — the
+pattern-matchable subset:
+
+| Rule | Detects | Default |
+|---|---|---|
+| `DPDP-A01` | personal data in application logs | critical |
+| `DPDP-A02` | personal data in URL query parameters | high |
+| `DPDP-A05` | hardcoded credentials, incl. `dpdpg_live_` / `dpdpg_agent_` keys | critical |
+| `DPDP-F01` | plaintext transport, or TLS verification disabled | critical |
+| `DPDP-F02` | weak or reversible password storage | critical |
+
+The other 21 rules — consent design, retention bindings, erasure reach, notice
+disclosures, children's data, rights endpoints — need code read in context, and
+live in the skills that run inside Claude Code. Run `/dpdp-audit` for those.
+
+Two things this gate does **not** do, by design:
+
+- It reports **candidates, not findings.** Every catalog rule carries a
+  confirmation step; a grep hit has not been through it.
+- A clean run means those five patterns did not match. It is not a statement
+  that an organisation is compliant — that is a regulator's determination.
+
+Annotate an intentional line with `dpdpguard:allow` to exempt it. `fail-on`
+accepts `critical|high|medium|low|never`, and `audit.exclude_paths` in
+`.dpdpguard.yaml` is honoured.
+
+The remote rule registry at `rules.dpdpguard.com` is not yet wired up.
 
 ## License
 

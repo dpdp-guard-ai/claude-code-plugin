@@ -18,7 +18,7 @@ This repository follows the **bstack** Claude Code plugin template structure:
 │   └── publish.yml            # npm Trusted Publishing (OIDC)
 ├── bin/
 │   ├── init.js                # Initializer CLI (`npx init`)
-│   └── audit-ci.js            # CI/CD auditor entrypoint (placeholder)
+│   └── audit-ci.js            # CI/CD auditor (grep-able subset of the catalog)
 ├── scripts/
 │   ├── sync-codex.ts          # Generates Codex artefacts (deterministic)
 │   └── validate-plugin.ts     # Enforces the rules below

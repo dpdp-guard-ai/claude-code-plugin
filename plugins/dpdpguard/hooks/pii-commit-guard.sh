@@ -27,16 +27,26 @@ fi
 
 # --- extract .tool_input.command from the payload -------------------------
 
+# Each method is tried in turn and its *output* checked, rather than branching
+# once on `command -v`. An interpreter that exists but does not work still
+# yields nothing: on Windows, `python3` commonly resolves to the Microsoft
+# Store alias, which satisfies `command -v`, prints an install notice to stderr
+# and exits non-zero. Branching on presence alone left COMMAND empty, and the
+# fail-open below then turned the guard into a no-op on every such machine.
 if [ -z "$COMMAND" ] && [ -n "$PAYLOAD" ]; then
   if command -v jq >/dev/null 2>&1; then
     COMMAND=$(printf '%s' "$PAYLOAD" | jq -r '.tool_input.command // empty' 2>/dev/null || true)
-  elif command -v python3 >/dev/null 2>&1; then
+  fi
+
+  if [ -z "$COMMAND" ] && command -v python3 >/dev/null 2>&1; then
     COMMAND=$(printf '%s' "$PAYLOAD" | python3 -c 'import json,sys
 try:
     print(json.load(sys.stdin).get("tool_input", {}).get("command", ""))
 except Exception:
     pass' 2>/dev/null || true)
-  else
+  fi
+
+  if [ -z "$COMMAND" ]; then
     # Last-resort extraction. Handles the common single-line case only.
     COMMAND=$(printf '%s' "$PAYLOAD" \
       | tr -d '\n' \
@@ -115,6 +125,12 @@ check '\b(sk-[A-Za-z0-9]{16,}|ghp_[A-Za-z0-9]{20,}|gho_[A-Za-z0-9]{20,}|AKIA[0-9
   'hardcoded provider credential' 'DPDP §8(5)'
 check '\b(api[_-]?key|secret|passwd|password|auth[_-]?token)\b[[:space:]]*[:=][[:space:]]*["'"'"'][A-Za-z0-9_\-]{16,}["'"'"']' \
   'hardcoded secret assignment' 'DPDP §8(5)'
+# DPDPGuard's own credentials. The platform uses distinct prefixes precisely so
+# that a leaked key is identifiable on sight: dpdpg_live_ is a service key for
+# /api/v1, dpdpg_agent_ is a scoped agent key for /mcp/v1. Neither is ever a
+# committable value — both are org-scoped and grant real access.
+check '\bdpdpg_(live|test|agent)_[A-Za-z0-9_-]{8,}' \
+  'DPDPGuard credential (rotate it — committing one grants org-scoped access)' 'DPDP §8(5) / GDPR Art.32'
 
 # Personal data in a URL query string
 check '[?&](email|phone|mobile|aadhaar|aadhar|otp|token|ssn)=' \
