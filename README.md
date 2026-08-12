@@ -31,7 +31,7 @@ regulator, or contact a data principal.
 ## Installation
 
 ```bash
-claude plugin marketplace add https://github.com/dpdpguard/claude-code-plugin
+claude plugin marketplace add https://github.com/dpdp-guard-ai/claude-code-plugin
 claude plugin install dpdpguard
 ```
 
@@ -107,7 +107,7 @@ npmjs.com:
 
 | Field | Value |
 |---|---|
-| Organization or user | `dpdpguard` |
+| Organization or user | `dpdp-guard-ai` |
 | Repository | `claude-code-plugin` |
 | Workflow filename | `publish.yml` |
 | Environment | `npm-publish` |
