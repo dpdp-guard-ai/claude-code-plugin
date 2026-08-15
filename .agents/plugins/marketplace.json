@@ -6,14 +6,14 @@
   "homepage_url": "https://github.com/dpdp-guard-ai/claude-code-plugin",
   "repository_url": "https://github.com/dpdp-guard-ai/claude-code-plugin",
   "readme_url": "https://github.com/dpdp-guard-ai/claude-code-plugin#readme",
-  "author": {
+  "owner": {
     "name": "DPDPGuard Team",
     "url": "https://dpdpguard.com"
   },
   "plugins": [
     {
       "name": "dpdpguard",
-      "path": "plugins/dpdpguard"
+      "source": "./plugins/dpdpguard"
     }
   ]
 }

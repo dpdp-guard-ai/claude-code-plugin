@@ -353,9 +353,9 @@ export function validate(): Issue[] {
   } else {
     const marketplace = JSON.parse(fs.readFileSync(marketplacePath, 'utf8'));
     for (const entry of marketplace.plugins ?? []) {
-      const target = path.join(projectRoot, entry.path);
+      const target = path.join(projectRoot, entry.source);
       if (!fs.existsSync(target)) {
-        err(marketplacePath, `catalog entry '${entry.name}' points at missing path '${entry.path}'`);
+        err(marketplacePath, `catalog entry '${entry.name}' points at missing source '${entry.source}'`);
       }
       if (!listPlugins().includes(entry.name)) {
         err(marketplacePath, `catalog entry '${entry.name}' has no matching plugin directory`);
